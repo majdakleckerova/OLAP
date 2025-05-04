@@ -58,3 +58,31 @@ QUOTE '"'
 ESCAPE '"';
 COPY 1894
 OLAP=# 
+
+
+# Postup
+1. výběr datové sady (https://www.kaggle.com/datasets/vivek468/superstore-dataset-final)
+2. transformace datové sady na hvězdicové schéma (faktová tabulka + 3 dimenze - date, product, customer)
+3. vytvoření databáze v PostgreSQL
+4. import dat .csv do databáze OLAP v PostgreSQL
+5. vytvoření diagramu hvězdicového schéma
+6. instalace Metabase přes docker (localhost:3000)
+7. připojení databáze OLAP do metabase
+8. 4 dotazy + vizualizace
+
+
+# Dotazy
+## 1. Vývoj ziskovosti podle segmentu zákazníků v čase (měsíc + rok)
+Zjistit, které zákaznické segmenty (Consumer, Corporate, Home Office) jsou nejziskovější a jak se jejich profit vyvíjel v čase.
+```sql
+SELECT 
+    d.year,
+    d.month,
+    c.segment,
+    SUM(f.profit) AS total_profit
+FROM fact_sales f
+JOIN dim_customer c ON f.customer_key = c.customer_key
+JOIN dim_date d ON f.date_id = d.date_id
+GROUP BY d.year, d.month, c.segment
+ORDER BY d.year, d.month, c.segment;
+```
