@@ -86,3 +86,119 @@ JOIN dim_date d ON f.date_id = d.date_id
 GROUP BY d.year, d.month, c.segment
 ORDER BY d.year, d.month, c.segment;
 ```
+
+
+## a. Vývoj zisku v čase podle regionu
+```sql
+SELECT
+  d.year,
+  c.region,
+  SUM(f.profit) AS total_profit
+FROM fact_sales f
+JOIN dim_date d ON f.date_id = d.date_id
+JOIN dim_customer c ON f.customer_key = c.customer_key
+GROUP BY d.year, c.region
+ORDER BY d.year, c.region;
+```
+
+## b. Zákaznické segmenty a jejich výkonnost
+```sql
+
+```
+
+## c. Slevy a jejich vliv na ziskovost
+```sql
+SELECT
+  CASE
+    WHEN f.discount BETWEEN 0.00 AND 0.05 THEN '0–5 %'
+    WHEN f.discount BETWEEN 0.05 AND 0.10 THEN '5–10 %'
+    WHEN f.discount BETWEEN 0.10 AND 0.20 THEN '10–20 %'
+    WHEN f.discount BETWEEN 0.20 AND 0.30 THEN '20–30 %'
+    WHEN f.discount > 0.30 THEN '30+ %'
+    ELSE 'Unknown'
+  END AS discount_range,
+  CASE
+    WHEN f.discount BETWEEN 0.00 AND 0.05 THEN 1
+    WHEN f.discount BETWEEN 0.05 AND 0.10 THEN 2
+    WHEN f.discount BETWEEN 0.10 AND 0.20 THEN 3
+    WHEN f.discount BETWEEN 0.20 AND 0.30 THEN 4
+    WHEN f.discount > 0.30 THEN 5
+    ELSE 6
+  END AS sort_order,
+  COUNT(*) AS number_of_sales,
+  SUM(f.sales) AS total_sales,
+  SUM(f.profit) AS total_profit,
+  ROUND(SUM(f.profit) / NULLIF(SUM(f.sales), 0), 2) AS profit_margin
+FROM fact_sales f
+GROUP BY discount_range, sort_order
+ORDER BY sort_order;
+```
+
+## d. Regionální výkon podle státu (s filtrem na rok
+```sql
+SELECT
+  c.state,
+  d.year,
+  p.category,
+  SUM(f.sales) AS total_sales,
+  SUM(f.profit) AS total_profit,
+  COUNT(DISTINCT f.order_id) AS total_orders,
+
+  -- Zaokrouhlené verze metrik
+  FLOOR(SUM(f.profit) / 5000) * 5000 AS rounded_profit,
+  FLOOR(SUM(f.sales) / 10000) * 10000 AS rounded_sales,
+  FLOOR(COUNT(DISTINCT f.order_id) / 50) * 50 AS rounded_orders
+
+FROM fact_sales f
+JOIN dim_customer c ON f.customer_key = c.customer_key
+JOIN dim_date d ON f.date_id = d.date_id
+JOIN dim_product p ON f.product_key = p.product_key
+WHERE 1=1
+[[AND d.year = {{year}}]]
+GROUP BY c.state, d.year, p.category
+ORDER BY total_profit DESC;
+```
+
+## e. Dotaz 5 - Celkový profit v jednotlivých qvartálech jednotlivých let
+```sql
+SELECT 
+    CONCAT(d.year, '-Q', d.quarter) AS year_quarter,
+    c.segment,
+    ROUND(SUM(f.profit), 2) AS total_profit
+FROM fact_sales f
+JOIN dim_date d ON f.date_id = d.date_id
+JOIN dim_customer c ON f.customer_key = c.customer_key
+JOIN dim_product p ON f.product_key = p.product_key
+GROUP BY d.year, d.quarter, c.segment
+ORDER BY d.year, d.quarter, c.segment;
+```
+
+## f. Dotaz 6 – 8 Podkategorií s nějvyšším profitem a jejich průměrná sleva, filtr rok
+```sql
+SELECT 
+    p.sub_category,
+    ROUND(SUM(f.profit), 2) AS total_profit,
+    ROUND(AVG(f.discount) * 100, 1) AS avg_discount_percent
+FROM fact_sales f
+JOIN dim_product p ON f.product_key = p.product_key
+JOIN dim_date d ON f.date_id = d.date_id
+WHERE 1=1
+  [[AND d.year = {{year}}]]
+GROUP BY p.sub_category
+ORDER BY total_profit DESC
+LIMIT 8;
+```
+
+## g. Města s nejvyšší tržbou podle státu
+```sql
+SELECT 
+    dim_customer.city,
+    ROUND(SUM(fact_sales.sales), 2) AS total_sales
+FROM fact_sales
+JOIN dim_customer ON fact_sales.customer_key = dim_customer.customer_key
+WHERE 1=1
+  [[AND {{state}}]]
+GROUP BY dim_customer.city
+ORDER BY total_sales DESC
+LIMIT 10;
+```
